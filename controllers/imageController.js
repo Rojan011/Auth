@@ -40,10 +40,25 @@ const uploadImageController = async (req, res) => {
 //Now creating fetching image controller
 const fetchImageController = async (req, res) => {
   try {
-    const images = await Image.find({});
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 2;
+    const skip = (page - 1) * limit;
+
+    const sortBy = req.query.sortBy || "createdAt";
+    const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
+    const totalImages = await Image.countDocuments();
+    const totalPages = Math.ceil(totalImages / limit);
+
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder;
+    const images = await Image.find().sort(sortObj).skip(skip).limit(limit);
+
     if (images) {
       res.status(200).json({
         success: true,
+        currentPage: page,
+        totalPages: totalPages,
+        totalImages: totalImages,
         data: images,
       });
     }
@@ -51,7 +66,7 @@ const fetchImageController = async (req, res) => {
     console.log(error);
     res.status(500).json({
       success: false,
-      message: "Something Went Wrong",
+      message: "Something went wrong! Please try again",
     });
   }
 };
