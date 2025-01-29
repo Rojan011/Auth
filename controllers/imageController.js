@@ -1,4 +1,5 @@
 const Image = require("../models/Image");
+const cloudinary = require("../config/cloudinary");
 const { uploadToCloudinary } = require("../helpers/cloudinaryHelper");
 const fs = require("fs");
 const uploadImageController = async (req, res) => {
@@ -54,4 +55,56 @@ const fetchImageController = async (req, res) => {
     });
   }
 };
-module.exports = { uploadImageController, fetchImageController };
+
+//Finally when all is said and done and we want to delete the image
+
+const deletImageController = async (req, res) => {
+  try {
+    //Steps to delete the image
+
+    //1. First we need to find the id of the image that we need to delete
+    const getCurrentIdOfImageToBeDeleted = req.params.id;
+
+    //2. Then we also need to find out the userId who is trying to delete the image to ensure that he is authorized to do so or else he is denied of deleting the image
+    const userId = req.userInfo.userId;
+
+    //3. Now we need to find the image in db->cloudinary
+    const image = await Image.findById(getCurrentIdOfImageToBeDeleted);
+    if (!image) {
+      return res.status(400).json({
+        success: false,
+        message: "Image not found",
+      });
+    }
+
+    //4.Then we need to check if the image that is being deleted has been uploaded by the same user who has uploaded it
+    if (image.uploadedBy.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to delete this image",
+      });
+    }
+
+    //5. Then finally you can delete the image->Firstly from cloudinary
+    await cloudinary.uploader.destroy(image.publicId);
+
+    //6. Once deleted from cloudinary you can move on to deleting it from mongodb
+    await Image.findByIdAndDelete(getCurrentIdOfImageToBeDeleted);
+
+    res.status(200).json({
+      success: true,
+      message: "Image deleted Successfully",
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      success: false,
+      message: "Something Went Wrong",
+    });
+  }
+};
+module.exports = {
+  uploadImageController,
+  fetchImageController,
+  deletImageController,
+};
